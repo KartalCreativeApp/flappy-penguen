@@ -32,8 +32,22 @@ let score = 0;
 let gameOver = false;
 let gameStarted = false;
 
-// Senin klasöründeki penguen görselini çeker
+// Görsel yükleme yönetimi
 const penguinImg = new Image();
+let imgLoaded = false;
+
+penguinImg.onload = () => {
+    imgLoaded = true;
+    drawStartScreen();
+};
+
+penguinImg.onerror = () => {
+    console.log("Penguen görseli yüklenemedi, varsayılan şekil kullanılacak.");
+    imgLoaded = false;
+    drawStartScreen(); // Görsel hata verse bile ekran donmasın, başlasın
+};
+
+// GitHub Pages'teki görselin adı tam olarak penguen.png olmalı
 penguinImg.src = 'penguen.png'; 
 
 function jump() {
@@ -76,9 +90,14 @@ function drawStartScreen() {
     ctx.font = "18px Arial";
     ctx.fillText("Başlamak için Ekrana Dokun", canvas.width/2 - 110, canvas.height/2 + 20);
 
-    // Pengueni önizleme olarak çiz
-    if (penguinImg.complete) {
+    // Penguen resmi varsa çiz, yoksa siyah bir penguen kafası temsili çiz
+    if (imgLoaded) {
         ctx.drawImage(penguinImg, canvas.width/2 - 22, canvas.height/2 - 120, 45, 45);
+    } else {
+        ctx.fillStyle = "#333";
+        ctx.beginPath();
+        ctx.arc(canvas.width/2, canvas.height/2 - 100, 22, 0, Math.PI * 2);
+        ctx.fill();
     }
 }
 
@@ -98,32 +117,4 @@ function loop() {
         return;
     }
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#4fc3f7";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    penguin.velocity += penguin.gravity;
-    penguin.y += penguin.velocity;
-
-    if (penguin.y + penguin.height > canvas.height || penguin.y < 0) {
-        gameOver = true;
-    }
-
-    if (penguinImg.complete) {
-        ctx.drawImage(penguinImg, penguin.x, penguin.y, penguin.width, penguin.height);
-    } else {
-        ctx.fillStyle = "orange";
-        ctx.fillRect(penguin.x, penguin.y, penguin.width, penguin.height);
-    }
-
-    if (frame % 90 === 0) {
-        let gap = 140;
-        let topHeight = Math.floor(Math.random() * (canvas.height - gap - 150)) + 50;
-        pipes.push({ x: canvas.width, top: topHeight, bottom: canvas.height - topHeight - gap, width: 65 });
-    }
-
-    for (let i = pipes.length - 1; i >= 0; i--) {
-        pipes[i].x -= 3.5;
-
-        // Kar temalı borular (Mavi/Beyaz buz sarkıtı gibi düşünebilirsin)
-        ctx.fillStyle = "#ffffff
+    ctx.clearRect(
