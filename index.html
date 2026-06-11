@@ -21,24 +21,28 @@ if (tg) { tg.ready(); tg.expand(); }
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-// --- YUMUŞAK FLAPPY BIRD FİZİK AYARLARI ---
+// --- ZAMAN SABİTLEME (DELTA TIME) DEĞİŞKENLERİ ---
+let lastTime = performance.now();
+
+// --- GERÇEK FLAPPY BIRD FİZİK AYARLARI ---
 let penguin = { 
     x: 60, 
-    y: 200, 
-    width: 45, 
-    height: 45, 
-    gravity: 0.25,      // Düşüş yumuşatıldı (Eski: 0.4)
-    lift: -5.5,         // Zıplama gücü dengelendi (Eski: -8)
+    y: 250, 
+    width: 42, 
+    height: 42, 
+    gravity: 24,       // Saniyede uygulanan yerçekimi (Çok soft düşüş)
+    lift: -320,        // Zıplama ivmesi (Yukarı doğru süzülerek fırlama)
     velocity: 0,
-    rotation: 0         // Sağa sola yumuşak dönüş açısı
+    rotation: 0
 };
 
 let pipes = [];
-let frame = 0;
+let pipeSpawnTimer = 0;
+const pipeSpawnInterval = 2.4; // Kaç saniyede bir yeni boru gelsin?
+const pipeSpeed = 130;         // Boruların saniyedeki kayma hızı (Yavaş ve tatlı akış)
 let score = 0;
 let gameOver = false;
 let gameStarted = false;
-const pipeSpeed = 2.2;  // Boruların akış hızı yavaşlatıldı (Eski: 3.5)
 
 // --- GÖRSEL YÜKLEMELERİ ---
 const penguinImg = new Image();
@@ -47,29 +51,27 @@ penguinImg.onload = () => { imgLoaded = true; if(!gameStarted) drawStartScreen()
 penguinImg.onerror = () => { imgLoaded = false; if(!gameStarted) drawStartScreen(); };
 penguinImg.src = 'penguen.png'; 
 
-// 1. Arka plan görseli ekleme yeri (Klasörüne arkaplan.png atarsan çalışır)
 const bgImg = new Image();
 let bgLoaded = false;
 bgImg.onload = () => { bgLoaded = true; };
 bgImg.src = 'arkaplan.png'; 
 
-// 2. Boru görseli ekleme yeri (Klasörüne boru.png atarsan çalışır)
 const pipeImg = new Image();
 let pipeImgLoaded = false;
 pipeImg.onload = () => { pipeImgLoaded = true; };
 pipeImg.src = 'boru.png'; 
 
-
 function jump() {
     if (!gameStarted) {
         gameStarted = true;
-        loop();
+        lastTime = performance.now();
+        requestAnimationFrame(loop);
         return;
     }
     if (gameOver) {
         resetGame();
     } else {
-        penguin.velocity = penguin.lift;
+        penguin.velocity = penguin.lift; // Sabit zıplama kuvveti
     }
 }
 
@@ -79,15 +81,16 @@ canvas.addEventListener("touchstart", (e) => { e.preventDefault(); jump(); }, { 
 canvas.addEventListener("mousedown", jump);
 
 function resetGame() {
-    penguin.y = 200;
+    penguin.y = 250;
     penguin.velocity = 0;
     penguin.rotation = 0;
     pipes = [];
+    pipeSpawnTimer = 0;
     score = 0;
-    frame = 0;
     gameOver = false;
     gameStarted = true;
-    loop();
+    lastTime = performance.now();
+    requestAnimationFrame(loop);
 }
 
 function drawStartScreen() {
@@ -102,7 +105,7 @@ function drawStartScreen() {
     ctx.fillText("Başlamak için Ekrana Dokun", canvas.width / 2, canvas.height / 2 + 20);
 
     if (imgLoaded) {
-        ctx.drawImage(penguinImg, canvas.width / 2 - 22, canvas.height / 2 - 120, 45, 45);
+        ctx.drawImage(penguinImg, canvas.width / 2 - 21, canvas.height / 2 - 120, 42, 42);
     }
 }
 
@@ -111,13 +114,39 @@ function drawBackground() {
     if (bgLoaded) {
         ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
     } else {
-        ctx.fillStyle = "#2b5c74"; // Görsel yoksa senin o koyu mavi/lacivert renk kalır
+        ctx.fillStyle = "#2b5c74"; 
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 }
 
-function loop() {
+// --- YUMUŞAK TASARIMLI VE BAŞLIKLI BORU ÇİZİCİ ---
+function drawSoftPipe(x, top, bottom, width) {
+    ctx.fillStyle = "#73bf2e";   // Boru ana rengi (Tatlı yeşil)
+    ctx.strokeStyle = "#4e851a"; // Kenar çizgisi rengi
+    ctx.lineWidth = 3;
+
+    // 1. ÜST BORU (Gövde)
+    ctx.fillRect(x + 4, 0, width - 8, top - 20);
+    ctx.strokeRect(x + 4, -10, width - 8, top - 10);
+    // Üst Boru Başlığı (Geniş ve yumuşak kenarlı kısım)
+    ctx.fillRect(x, top - 25, width, 25);
+    ctx.strokeRect(x, top - 25, width, 25);
+
+    // 2. ALT BORU (Gövde)
+    ctx.fillRect(x + 4, canvas.height - bottom + 20, width - 8, bottom - 20);
+    ctx.strokeRect(x + 4, canvas.height - bottom + 20, width - 8, bottom + 10);
+    // Alt Boru Başlığı
+    ctx.fillRect(x, canvas.height - bottom, width, 25);
+    ctx.strokeRect(x, canvas.height - bottom, width, 25);
+}
+
+function loop(currentTime) {
     if (!gameStarted) return;
+
+    // Saniyedeki kare hızından bağımsız zaman hesabı (dt)
+    let dt = (currentTime - lastTime) / 1000;
+    if (dt > 0.1) dt = 0.1; // Tarayıcı sekme değiştirirse sapıtmasın diye sınır
+    lastTime = currentTime;
 
     if (gameOver) {
         ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
@@ -135,21 +164,22 @@ function loop() {
 
     drawBackground();
 
-    // Hız ve Rotasyon Hesaplaması (Dönüş Efekti)
-    penguin.velocity += penguin.gravity;
-    penguin.y += penguin.velocity;
+    // Fizik Güncellemeleri (Zamana Bağlı)
+    penguin.velocity += penguin.gravity * dt * 60;
+    penguin.y += penguin.velocity * dt;
 
+    // Yumuşak Rotasyon (Dönüş) Hesaplaması
     if (penguin.velocity < 0) {
-        penguin.rotation = Math.max(-0.4, penguin.velocity * 0.08); // Yukarı zıplarken kafayı kaldırır
-    } else if (penguin.velocity > 0) {
-        penguin.rotation = Math.min(1.2, penguin.rotation + 0.04);  // Düşerken kafayı aşağı eğer
+        penguin.rotation = -0.3; // Zıplarken sabit yukarı bakış açısı
+    } else {
+        penguin.rotation = Math.min(1.1, penguin.rotation + 3 * dt); // Düşerken kademeli aşağı süzülme
     }
 
     if (penguin.y + penguin.height > canvas.height || penguin.y < 0) {
         gameOver = true;
     }
 
-    // --- PENGUENİ DÖNDÜREREK ÇİZME ALANI ---
+    // Pengueni Çiz
     ctx.save();
     ctx.translate(penguin.x + penguin.width / 2, penguin.y + penguin.height / 2);
     ctx.rotate(penguin.rotation);
@@ -161,35 +191,35 @@ function loop() {
     }
     ctx.restore();
 
-    // --- ENGELLER (BORULAR) ---
-    if (frame % 110 === 0) { // Boruların sıklığı ideal mesafeye çekildi
-        let gap = 145;      // Penguenin geçeceği boşluk biraz genişletildi
-        let topHeight = Math.floor(Math.random() * (canvas.height - gap - 200)) + 50;
-        pipes.push({ x: canvas.width, top: topHeight, bottom: canvas.height - topHeight - gap, width: 65, counted: false });
+    // Zaman Ayarlı Boru Ekleme mekanizması
+    pipeSpawnTimer += dt;
+    if (pipeSpawnTimer >= pipeSpawnInterval) {
+        let gap = 140; // Penguenin rahat geçebileceği ideal boşluk
+        let topHeight = Math.floor(Math.random() * (canvas.height - gap - 220)) + 60;
+        pipes.push({ x: canvas.width, top: topHeight, bottom: canvas.height - topHeight - gap, width: 68, counted: false });
+        pipeSpawnTimer = 0;
     }
 
+    // Boruları Yürüt ve Çiz
     for (let i = pipes.length - 1; i >= 0; i--) {
-        pipes[i].x -= pipeSpeed;
+        pipes[i].x -= pipeSpeed * dt;
 
         if (pipeImgLoaded) {
-            // Boru görseli varsa ters ve düz olarak basar
             ctx.drawImage(pipeImg, pipes[i].x, 0, pipes[i].width, pipes[i].top);
             ctx.drawImage(pipeImg, pipes[i].x, canvas.height - pipes[i].bottom, pipes[i].width, pipes[i].bottom);
         } else {
-            // Boru görseli yoksa gri blokları çizer
-            ctx.fillStyle = "#737373";
-            ctx.fillRect(pipes[i].x, 0, pipes[i].width, pipes[i].top);
-            ctx.fillRect(pipes[i].x, canvas.height - pipes[i].bottom, pipes[i].width, pipes[i].bottom);
+            // Görsel yoksa kodla çizdiğimiz o yeni yumuşak hatlı yeşil boruları kullanır
+            drawSoftPipe(pipes[i].x, pipes[i].top, pipes[i].bottom, pipes[i].width);
         }
 
-        // Hassas Çarpışma Testi
-        if (penguin.x + 5 < pipes[i].x + pipes[i].width && penguin.x + penguin.width - 5 > pipes[i].x) {
-            if (penguin.y + 5 < pipes[i].top || penguin.y + penguin.height - 5 > canvas.height - pipes[i].bottom) {
+        // Yumuşatılmış Çarpışma Kutusu (Kafadan ve arkadan hafif pay bırakır ki haksız yere yanmasın)
+        if (penguin.x + 6 < pipes[i].x + pipes[i].width && penguin.x + penguin.width - 6 > pipes[i].x) {
+            if (penguin.y + 6 < pipes[i].top || penguin.y + penguin.height - 6 > canvas.height - pipes[i].bottom) {
                 gameOver = true;
             }
         }
 
-        // Skor Sayacı
+        // Skor Hesaplama
         if (!pipes[i].counted && pipes[i].x + pipes[i].width / 2 < penguin.x) {
             score++;
             pipes[i].counted = true;
@@ -206,11 +236,11 @@ function loop() {
     ctx.textAlign = "center";
     ctx.fillText(score, canvas.width / 2, 60);
 
-    frame++;
     requestAnimationFrame(loop);
 }
 
-setTimeout(() => { if (!gameStarted) drawStartScreen(); }, 200);
+// İlk ekranı ayarla
+setTimeout(() => { if (!gameStarted) drawStartScreen(); }, 150);
 </script>
 </body>
 </html>
