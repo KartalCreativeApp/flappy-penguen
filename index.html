@@ -24,7 +24,6 @@ if (tg) {
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-// Oyun Değişkenleri
 let penguin = { x: 60, y: 200, width: 45, height: 45, gravity: 0.4, lift: -8, velocity: 0 };
 let pipes = [];
 let frame = 0;
@@ -32,22 +31,19 @@ let score = 0;
 let gameOver = false;
 let gameStarted = false;
 
-// Görsel yükleme yönetimi
 const penguinImg = new Image();
 let imgLoaded = false;
 
 penguinImg.onload = () => {
     imgLoaded = true;
-    drawStartScreen();
+    if(!gameStarted) drawStartScreen();
 };
 
 penguinImg.onerror = () => {
-    console.log("Penguen görseli yüklenemedi, varsayılan şekil kullanılacak.");
     imgLoaded = false;
-    drawStartScreen(); // Görsel hata verse bile ekran donmasın, başlasın
+    if(!gameStarted) drawStartScreen();
 };
 
-// GitHub Pages'teki görselin adı tam olarak penguen.png olmalı
 penguinImg.src = 'penguen.png'; 
 
 function jump() {
@@ -63,7 +59,6 @@ function jump() {
     }
 }
 
-// Kontroller
 window.addEventListener("keydown", (e) => { if (e.code === "Space") jump(); });
 canvas.addEventListener("touchstart", (e) => { e.preventDefault(); jump(); }, { passive: false });
 canvas.addEventListener("mousedown", jump);
@@ -80,23 +75,24 @@ function resetGame() {
 }
 
 function drawStartScreen() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = "#4fc3f7";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
     ctx.fillStyle = "white";
     ctx.font = "bold 28px Arial";
-    ctx.fillText("FLAPPY PENGUEN", canvas.width/2 - 120, canvas.height/2 - 50);
+    ctx.textAlign = "center";
+    ctx.fillText("FLAPPY PENGUEN", canvas.width / 2, canvas.height / 2 - 50);
     
     ctx.font = "18px Arial";
-    ctx.fillText("Başlamak için Ekrana Dokun", canvas.width/2 - 110, canvas.height/2 + 20);
+    ctx.fillText("Başlamak için Ekrana Dokun", canvas.width / 2, canvas.height / 2 + 20);
 
-    // Penguen resmi varsa çiz, yoksa siyah bir penguen kafası temsili çiz
     if (imgLoaded) {
-        ctx.drawImage(penguinImg, canvas.width/2 - 22, canvas.height/2 - 120, 45, 45);
+        ctx.drawImage(penguinImg, canvas.width / 2 - 22, canvas.height / 2 - 120, 45, 45);
     } else {
         ctx.fillStyle = "#333";
         ctx.beginPath();
-        ctx.arc(canvas.width/2, canvas.height/2 - 100, 22, 0, Math.PI * 2);
+        ctx.arc(canvas.width / 2, canvas.height / 2 - 100, 22, 0, Math.PI * 2);
         ctx.fill();
     }
 }
@@ -109,12 +105,79 @@ function loop() {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = "white";
         ctx.font = "bold 30px Arial";
-        ctx.fillText("OYUN BİTTİ", canvas.width/2 - 85, canvas.height/2 - 20);
+        ctx.textAlign = "center";
+        ctx.fillText("OYUN BİTTİ", canvas.width / 2, canvas.height / 2 - 20);
         ctx.font = "20px Arial";
-        ctx.fillText(`Skorun: ${score}`, canvas.width/2 - 40, canvas.height/2 + 20);
+        ctx.fillText(`Skorun: ${score}`, canvas.width / 2, canvas.height / 2 + 20);
         ctx.font = "16px Arial";
-        ctx.fillText("Tekrar oynamak için dokun", canvas.width/2 - 95, canvas.height/2 + 60);
+        ctx.fillText("Tekrar oynamak için dokun", canvas.width / 2, canvas.height / 2 + 60);
         return;
     }
 
-    ctx.clearRect(
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#4fc3f7";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    penguin.velocity += penguin.gravity;
+    penguin.y += penguin.velocity;
+
+    if (penguin.y + penguin.height > canvas.height || penguin.y < 0) {
+        gameOver = true;
+    }
+
+    if (imgLoaded) {
+        ctx.drawImage(penguinImg, penguin.x, penguin.y, penguin.width, penguin.height);
+    } else {
+        ctx.fillStyle = "#333";
+        ctx.fillRect(penguin.x, penguin.y, penguin.width, penguin.height);
+    }
+
+    if (frame % 90 === 0) {
+        let gap = 140;
+        let topHeight = Math.floor(Math.random() * (canvas.height - gap - 150)) + 50;
+        pipes.push({ x: canvas.width, top: topHeight, bottom: canvas.height - topHeight - gap, width: 65 });
+    }
+
+    for (let i = pipes.length - 1; i >= 0; i--) {
+        pipes[i].x -= 3.5;
+
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(pipes[i].x, 0, pipes[i].width, pipes[i].top);
+        ctx.fillRect(pipes[i].x, canvas.height - pipes[i].bottom, pipes[i].width, pipes[i].bottom);
+        
+        ctx.strokeStyle = "#00bcd4";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(pipes[i].x, 0, pipes[i].width, pipes[i].top);
+        ctx.strokeRect(pipes[i].x, canvas.height - pipes[i].bottom, pipes[i].width, pipes[i].bottom);
+
+        if (penguin.x + penguin.width > pipes[i].x && penguin.x < pipes[i].x + pipes[i].width) {
+            if (penguin.y < pipes[i].top || penguin.y + penguin.height > canvas.height - pipes[i].bottom) {
+                gameOver = true;
+            }
+        }
+
+        if (pipes[i].x + pipes[i].width === Math.floor(penguin.x)) {
+            score++;
+        }
+
+        if (pipes[i].x + pipes[i].width < 0) {
+            pipes.splice(i, 1);
+        }
+    }
+
+    ctx.fillStyle = "white";
+    ctx.font = "bold 45px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(score, canvas.width / 2, 60);
+
+    frame++;
+    requestAnimationFrame(loop);
+}
+
+// Resim yüklenemezse bile 200ms sonra zorla ekranı çiz
+setTimeout(() => {
+    if (!gameStarted) drawStartScreen();
+}, 200);
+</script>
+</body>
+</html>
