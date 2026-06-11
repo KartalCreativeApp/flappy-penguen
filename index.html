@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Flappy Penguen</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { margin: 0; padding: 0; background: #1a1a1a; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: 'Arial', sans-serif; }
+        canvas { background: #4fc3f7; display: block; max-width: 100%; max-height: 100vh; box-shadow: 0 0 30px rgba(0,0,0,0.7); border-radius: 10px; }
+    </style>
+</head>
+<body>
+
+<canvas id="gameCanvas" width="400" height="600"></canvas>
+
+<script>
+const tg = window.Telegram?.WebApp;
+if (tg) {
+    tg.ready();
+    tg.expand();
+}
+
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+// Oyun Değişkenleri
+let penguin = { x: 60, y: 200, width: 45, height: 45, gravity: 0.4, lift: -8, velocity: 0 };
+let pipes = [];
+let frame = 0;
+let score = 0;
+let gameOver = false;
+let gameStarted = false;
+
+// Senin klasöründeki penguen görselini çeker
+const penguinImg = new Image();
+penguinImg.src = 'penguen.png'; 
+
+function jump() {
+    if (!gameStarted) {
+        gameStarted = true;
+        loop();
+        return;
+    }
+    if (gameOver) {
+        resetGame();
+    } else {
+        penguin.velocity = penguin.lift;
+    }
+}
+
+// Kontroller
+window.addEventListener("keydown", (e) => { if (e.code === "Space") jump(); });
+canvas.addEventListener("touchstart", (e) => { e.preventDefault(); jump(); }, { passive: false });
+canvas.addEventListener("mousedown", jump);
+
+function resetGame() {
+    penguin.y = 200;
+    penguin.velocity = 0;
+    pipes = [];
+    score = 0;
+    frame = 0;
+    gameOver = false;
+    gameStarted = true;
+    loop();
+}
+
+function drawStartScreen() {
+    ctx.fillStyle = "#4fc3f7";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.fillStyle = "white";
+    ctx.font = "bold 28px Arial";
+    ctx.fillText("FLAPPY PENGUEN", canvas.width/2 - 120, canvas.height/2 - 50);
+    
+    ctx.font = "18px Arial";
+    ctx.fillText("Başlamak için Ekrana Dokun", canvas.width/2 - 110, canvas.height/2 + 20);
+
+    // Pengueni önizleme olarak çiz
+    if (penguinImg.complete) {
+        ctx.drawImage(penguinImg, canvas.width/2 - 22, canvas.height/2 - 120, 45, 45);
+    }
+}
+
+function loop() {
+    if (!gameStarted) return;
+
+    if (gameOver) {
+        ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "white";
+        ctx.font = "bold 30px Arial";
+        ctx.fillText("OYUN BİTTİ", canvas.width/2 - 85, canvas.height/2 - 20);
+        ctx.font = "20px Arial";
+        ctx.fillText(`Skorun: ${score}`, canvas.width/2 - 40, canvas.height/2 + 20);
+        ctx.font = "16px Arial";
+        ctx.fillText("Tekrar oynamak için dokun", canvas.width/2 - 95, canvas.height/2 + 60);
+        return;
+    }
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#4fc3f7";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    penguin.velocity += penguin.gravity;
+    penguin.y += penguin.velocity;
+
+    if (penguin.y + penguin.height > canvas.height || penguin.y < 0) {
+        gameOver = true;
+    }
+
+    if (penguinImg.complete) {
+        ctx.drawImage(penguinImg, penguin.x, penguin.y, penguin.width, penguin.height);
+    } else {
+        ctx.fillStyle = "orange";
+        ctx.fillRect(penguin.x, penguin.y, penguin.width, penguin.height);
+    }
+
+    if (frame % 90 === 0) {
+        let gap = 140;
+        let topHeight = Math.floor(Math.random() * (canvas.height - gap - 150)) + 50;
+        pipes.push({ x: canvas.width, top: topHeight, bottom: canvas.height - topHeight - gap, width: 65 });
+    }
+
+    for (let i = pipes.length - 1; i >= 0; i--) {
+        pipes[i].x -= 3.5;
+
+        // Kar temalı borular (Mavi/Beyaz buz sarkıtı gibi düşünebilirsin)
+        ctx.fillStyle = "#ffffff
